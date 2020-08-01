@@ -2,7 +2,7 @@ Interactive 3D Assignment 1
 Harrison Ellem, s3718372
 
 Notes
- - = and - chande segment_count, while + and _ change the wave thing (hold shift)
+ - = and - change segment_count, while + and _ change the wave thing (hold shift)
  - Tesselation  below 16 breaks the barrels, as they use x-coordinates to determine their y-values. 
  Could be fixed by widening the range, but that would made the floating less accurate, so I've left it as is.
  - No idea how to fill in sine wave, probably integration.
