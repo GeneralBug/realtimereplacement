@@ -25,6 +25,7 @@ SDL_Window* mainWindow = 0;
 const int n = 100;
 vec2f r[n];
 vec2f v[n];
+SDL_Renderer* renderer;
 
 void init()
 {
@@ -33,7 +34,7 @@ void init()
 
 void drawAxes(float length)
 {
-    glClear(GL_COLOR_BUFFER_BIT);
+    update();
 }
 
 
@@ -58,10 +59,18 @@ void display()
 
 void update()
 {
+    // Randomly change the colour
+    Uint8 red = rand() % 255;
+    Uint8 green = rand() % 255;
+    Uint8 blue = rand() % 255;
+    // Fill the screen with the colour
+    SDL_SetRenderDrawColor(renderer, red, green, blue, 255);
+    SDL_RenderClear(renderer);
+    SDL_RenderPresent(renderer);
     // we'll switch between red and blue when the user presses a key:
-    GLfloat colors[][3] = { { 1.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f } };
-    static int back;
-    glClearColor(colors[back][0], colors[back][1], colors[back][2], 1.0f);
+    //GLfloat colors[][3] = { { 1.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f } };
+    //static int back;
+    //glClearColor(colors[back][0], colors[back][1], colors[back][2], 1.0f);
         
     
     // Update positions here 
@@ -154,6 +163,14 @@ int main(int argc, char** argv)
         return EXIT_SUCCESS;
     }
 
+    //renderer
+    SDL_Renderer* renderer = SDL_CreateRenderer(mainWindow, -1, SDL_RENDERER_ACCELERATED);
+    if (renderer == nullptr)
+    {
+        SDL_Log("Could not create a renderer: %s", SDL_GetError());
+        return -1;
+    }
+
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GLContext mainGLContext = SDL_GL_CreateContext(mainWindow);
@@ -180,14 +197,26 @@ int main(int argc, char** argv)
     // Main event and display loop goes here
     while (!done)
     {
+
         done = handleEvents();
-        update();
-        drawAxes(1);
-        SDL_GL_SwapWindow(mainWindow);
+
+        // Get the next event
+        SDL_Event event;
+        if (SDL_PollEvent(&event))
+        {
+            if (event.type == SDL_QUIT)
+            {
+                // Break out of the loop on quit
+                break;
+            }
+        }
+        //update();
+        display();
+        //SDL_GL_SwapWindow(mainWindow);
     }
 
 
-
+    SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(mainWindow);
     SDL_Quit();
 
