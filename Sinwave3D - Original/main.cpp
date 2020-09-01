@@ -19,7 +19,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/constants.hpp>
-#include <SDL.h>
 
 
 typedef enum {
@@ -35,7 +34,7 @@ typedef enum {
 } DebugFlags;
 
 bool debug[d_nflags] = { false, false, false, false, false, false, false, false };
-//bool debug = false;
+
 typedef struct { float r, g, b; } color3f;
 
 typedef enum { line, fill } polygonMode_t;
@@ -65,8 +64,6 @@ Global g = { grid, false, 0.0, 0.0, line, true, false, false, false, 0, 0, 8, 2,
 
 typedef enum { inactive, rotate, pan, zoom } CameraControl;
 
-SDL_Window* window;
-
 struct camera_t {
     int lastX, lastY;
     float rotateX, rotateY;
@@ -87,24 +84,7 @@ const float milli = 1000.0;
 glm::mat4 modelViewMatrix;
 glm::mat3 normalMatrix;
 
-void (*displayFunc)();
-void display();
-void displayMultiView();
-
 int err;
-
-void quit(int code) //done
-{
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-    exit(code);
-}
-
-int wantRedisplay = 1;
-void postRedisplay() //done
-{
-    wantRedisplay = 1;
-}
 
 void printVec(float* v, int n)
 {
@@ -137,19 +117,15 @@ void printMatrixColumnMajor(float* m, int n)
     printf("\n");
 }
 
-void init(void) //done
+void init(void)
 {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     if (g.twoside)
         glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
     glEnable(GL_DEPTH_TEST);
-    glShadeModel(GL_FLAT);
-    glColor3f(1.0, 1.0, 1.0);
-
-    displayFunc = &display;
 }
 
-void reshape(int w, int h) //done
+void reshape(int w, int h)
 {
     g.width = w;
     g.height = h;
@@ -217,60 +193,59 @@ void consolePM()
 }
 
 // On screen display 
-//void displayOSD()
-//{
-//    //TODO: glut? just ui text
-//    char buffer[30];
-//    char* bufp;
-//    int w, h;
-//
-//    glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT);
-//    glDisable(GL_DEPTH_TEST);
-//    glDisable(GL_LIGHTING);
-//
-//    glMatrixMode(GL_PROJECTION);
-//    glPushMatrix();
-//    glLoadIdentity();
-//
-//    /* Set up orthographic coordinate system to match the window,
-//       i.e. (0,0)-(w,h) */
-//    w = glutGet(GLUT_WINDOW_WIDTH);
-//    h = glutGet(GLUT_WINDOW_HEIGHT);
-//    glOrtho(0.0, w, 0.0, h, -1.0, 1.0);
-//
-//    glMatrixMode(GL_MODELVIEW);
-//    glPushMatrix();
-//    glLoadIdentity();
-//
-//    /* Frame rate */
-//    glColor3f(1.0, 1.0, 0.0);
-//    glRasterPos2i(10, 60);
-//    snprintf(buffer, sizeof buffer, "frame rate (f/s):  %5.0f", g.frameRate);
-//    for (bufp = buffer; *bufp; bufp++)
-//        glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
-//
-//    /* Frame time */
-//    glColor3f(1.0, 1.0, 0.0);
-//    glRasterPos2i(10, 40);
-//    snprintf(buffer, sizeof buffer, "frame time (ms/f): %5.0f", 1.0 / g.frameRate * milli);
-//    for (bufp = buffer; *bufp; bufp++)
-//        glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
-//
-//    /* Tesselation */
-//    glColor3f(1.0, 1.0, 0.0);
-//    glRasterPos2i(10, 20);
-//    snprintf(buffer, sizeof buffer, "tesselation:       %5d", g.tess);
-//    for (bufp = buffer; *bufp; bufp++)
-//        glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
-//
-//    glPopMatrix();  /* Pop modelview */
-//    glMatrixMode(GL_PROJECTION);
-//
-//    glPopMatrix();  /* Pop projection */
-//    glMatrixMode(GL_MODELVIEW);
-//
-//    glPopAttrib();
-//}
+void displayOSD()
+{
+    char buffer[30];
+    char* bufp;
+    int w, h;
+
+    glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_LIGHTING);
+
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+
+    /* Set up orthographic coordinate system to match the window,
+       i.e. (0,0)-(w,h) */
+    w = glutGet(GLUT_WINDOW_WIDTH);
+    h = glutGet(GLUT_WINDOW_HEIGHT);
+    glOrtho(0.0, w, 0.0, h, -1.0, 1.0);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    /* Frame rate */
+    glColor3f(1.0, 1.0, 0.0);
+    glRasterPos2i(10, 60);
+    snprintf(buffer, sizeof buffer, "frame rate (f/s):  %5.0f", g.frameRate);
+    for (bufp = buffer; *bufp; bufp++)
+        glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
+
+    /* Frame time */
+    glColor3f(1.0, 1.0, 0.0);
+    glRasterPos2i(10, 40);
+    snprintf(buffer, sizeof buffer, "frame time (ms/f): %5.0f", 1.0 / g.frameRate * milli);
+    for (bufp = buffer; *bufp; bufp++)
+        glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
+
+    /* Tesselation */
+    glColor3f(1.0, 1.0, 0.0);
+    glRasterPos2i(10, 20);
+    snprintf(buffer, sizeof buffer, "tesselation:       %5d", g.tess);
+    for (bufp = buffer; *bufp; bufp++)
+        glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
+
+    glPopMatrix();  /* Pop modelview */
+    glMatrixMode(GL_PROJECTION);
+
+    glPopMatrix();  /* Pop projection */
+    glMatrixMode(GL_MODELVIEW);
+
+    glPopAttrib();
+}
 
 
 /* Perform ADS - ambient, diffuse and specular - lighting calculation
@@ -348,7 +323,6 @@ glm::vec3 computeLighting(glm::vec3& rEC, glm::vec3& nEC)
 
 void drawGrid(int tess)
 {
-    //TODO: glut
     float stepSize = 2.0 / tess;
     glm::vec3 r, n, rEC, nEC;
     int i, j;
@@ -581,10 +555,9 @@ void drawSineWave(int tess)
 
 void idle()
 {
-    //TODO: glut
     float t, dt;
 
-    t = SDL_GetTicks() / milli;
+    t = glutGet(GLUT_ELAPSED_TIME) / milli;
 
     // Accumulate time if animation enabled
     if (g.animate) {
@@ -605,10 +578,10 @@ void idle()
         g.frameCount = 0;
     }
 
-    postRedisplay();
+    glutPostRedisplay();
 }
 
-void displayMultiView() //done
+void displayMultiView()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
@@ -657,20 +630,19 @@ void displayMultiView() //done
     else
         drawSineWave(g.tess);
 
-    //if (g.displayOSD)
-    //    displayOSD();
+    if (g.displayOSD)
+        displayOSD();
 
     if (g.consolePM)
         consolePM();
 
     g.frameCount++;
 
-    // Does the same thing as glutSwapBuffers
-    SDL_GL_SwapWindow(window);
+    glutSwapBuffers();
 
 }
 
-void display() //done
+void display()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
@@ -701,14 +673,13 @@ void display() //done
     else
         drawSineWave(g.tess);
 
-    //if (g.displayOSD)
-    //    displayOSD();
+    if (g.displayOSD)
+        displayOSD();
 
     if (g.consolePM)
         consolePM();
 
-    // Does the same thing as glutSwapBuffers
-    SDL_GL_SwapWindow(window);
+    glutSwapBuffers();
 
     g.frameCount++;
 
@@ -718,98 +689,77 @@ void display() //done
     }
 }
 
-void keyDown(SDL_KeyboardEvent *e)
+void keyboard(unsigned char key, int x, int y)
 {
-    /*
-        ESCAPE  : close
-        A       : toggle animation
-        L       : toggle lighting
-        F       : no idea
-        M       : toggle wireframe
-        N       : toggle normals
-        C       : print stats to console
-        S       : switch between grid and wave
-        4       : toggle multiview
-        V       : toggle VBOs?
-        F1      : increase tesselation
-        F2      : decrease tesselation
-        Z       : switch between wave and hill thing
-    */
-    switch (e->keysym.sym) {
-    case SDLK_ESCAPE:
+    switch (key) {
+    case 27:
         printf("exit\n");
         exit(0);
         break;
-    case SDLK_a:
-        printf("a; toggling animation\n");
+    case 'a':
         g.animate = !g.animate;
         if (g.animate) {
-            g.lastT = SDL_GetTicks() / milli;//TODO
+            g.lastT = glutGet(GLUT_ELAPSED_TIME) / milli;
         }
         break;
-    case SDLK_l:
-        printf("l; toggling lighting\n");
+    case 'l':
         g.lighting = !g.lighting;
-        postRedisplay();
+        glutPostRedisplay();
         break;
-    case SDLK_f:
-        printf("f; toggling \'fixed\'\n");
+    case 'f':
         g.fixed = !g.fixed;
-        postRedisplay();
+        glutPostRedisplay();
         break;
-    case SDLK_m:
+    case 'm':
         printf("%d\n", g.polygonMode);
         if (g.polygonMode == line)
             g.polygonMode = fill;
         else
             g.polygonMode = line;
-        postRedisplay();
+        glutPostRedisplay();
         break;
-    case SDLK_n:
-        printf("n; toggling normals\n");
+    case 'n':
         g.drawNormals = !g.drawNormals;
-        postRedisplay();
+        glutPostRedisplay();
         break;
-    case SDLK_c:
+    case 'c':
         g.consolePM = !g.consolePM;
-        postRedisplay();
+        glutPostRedisplay();
         break;
-    case SDLK_s:
-        printf("s; changing shape\n");
+    case 'o':
+        g.displayOSD = !g.displayOSD;
+        glutPostRedisplay();
+        break;
+    case 's':
         g.shape = g.shape == grid ? wave : grid;
         g.animate = false;
-        postRedisplay();
         break;
-    case SDLK_4:
-        printf("4; toggling multiview\n");
+    case '4':
         g.multiView = !g.multiView;
         if (g.multiView)
-            displayFunc = &displayMultiView;
+            glutDisplayFunc(displayMultiView);
         else
-            displayFunc = &display;
-        postRedisplay();
+            glutDisplayFunc(display);
+        glutPostRedisplay();
         break;
-    case SDLK_v:
-        printf("vbos not implemented\n");//TODO
+    case 'v':
+        printf("vbos not implemented\n");
         break;
-    case SDLK_F1:
-        printf("increasing tesselation\n");
+    case '+':
         g.tess *= 2;
-        postRedisplay();
+        glutPostRedisplay();
         break;
-    case SDLK_F2:
-        printf("decreasing tesselation\n");
+    case '-':
         g.tess /= 2;
         if (g.tess < 8)
             g.tess = 8;
-        postRedisplay();
+        glutPostRedisplay();
         break;
-    case SDLK_z:
-        printf("z; changing wave\n");
+    case 'z':
         g.waveDim++;
         if (g.waveDim > 3)
             g.waveDim = 2;
-        postRedisplay();
+        glutPostRedisplay();
         break;
     default:
         break;
@@ -818,7 +768,6 @@ void keyDown(SDL_KeyboardEvent *e)
 
 void mouse(int button, int state, int x, int y)
 {
-    //TODO: glut
     if (debug[d_mouse])
         printf("mouse: %d %d %d\n", button, x, y);
 
@@ -856,163 +805,39 @@ void motion(int x, int y)
     camera.lastX = x;
     camera.lastY = y;
 
-    switch (camera.control) 
-    {
-        case inactive:
-            break;
-        case rotate:
-            camera.rotateX += dy;
-            camera.rotateY += dx;
-            break;
-        case pan:
-            break;
-        case zoom:
-            camera.scale += dy / 100.0;
-            break;
+    switch (camera.control) {
+    case inactive:
+        break;
+    case rotate:
+        camera.rotateX += dy;
+        camera.rotateY += dx;
+        break;
+    case pan:
+        break;
+    case zoom:
+        camera.scale += dy / 100.0;
+        break;
     }
 
-    postRedisplay();
+    glutPostRedisplay();
 }
 
-void eventDispatcher()
+
+
+int main(int argc, char** argv)
 {
-    SDL_Event e;
-
-    // Handle events, stolen from robot example
-    while (SDL_PollEvent(&e)) 
-    {
-        switch (e.type) 
-        {
-            case SDL_QUIT:
-                if (debug)
-                    printf("Quit\n");
-                quit(0);
-                break;
-            case SDL_MOUSEMOTION:
-                //if (debug)
-                //    printf("Mouse moved by %d,%d to (%d,%d)\n",
-                //e.motion.xrel, e.motion.yrel, e.motion.x, e.motion.y);
-                break;
-            case SDL_MOUSEBUTTONDOWN:
-                //if (debug)
-                //    printf("Mouse button %d pressed at (%d,%d)\n",
-                //e.button.button, e.button.x, e.button.y);
-                break;
-            case SDL_KEYDOWN:
-                keyDown(&e.key);
-                break;
-            case SDL_WINDOWEVENT:
-                if (debug)
-                    printf("Window event %d\n", e.window.event);
-                switch (e.window.event)
-                {
-                    case SDL_WINDOWEVENT_SHOWN:
-                        if (debug)
-                            SDL_Log("Window %d shown", e.window.windowID);
-                        break;
-                    case SDL_WINDOWEVENT_SIZE_CHANGED:
-                        if (debug)
-                            printf("SDL_WINDOWEVENT_SIZE_CHANGED\n");
-                        break;
-                    case SDL_WINDOWEVENT_RESIZED:
-                        if (debug)
-                            printf("SDL_WINDOWEVENT_RESIZED.\n");
-                        if (e.window.windowID == SDL_GetWindowID(window)) 
-                        {
-                            SDL_SetWindowSize(window, e.window.data1, e.window.data2);
-                            reshape(e.window.data1, e.window.data2);
-                            postRedisplay();
-                        }
-                        break;
-                    case SDL_WINDOWEVENT_CLOSE:
-                        if (debug)
-                            printf("Window close event\n");
-                        break;
-                    default:
-                        break;
-                }
-                break;
-            default:
-                break;
-        }
-    }
-}
-
-void update()
-{
-    //physics and ai stuff
-    idle();
-}
-
-void sys_shutdown()
-{
-    SDL_Quit();
-}
-
-void mainLoop() //done
-{
-    while (1) {
-        eventDispatcher();
-        if (wantRedisplay) {
-            displayFunc();
-            wantRedisplay = 0;
-        }
-        update();
-    }
-}
-
-int initGraphics()
-{
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-
-    window =
-        SDL_CreateWindow("Robot Arm Using SDL2",
-            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-            640, 480, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-    if (!window) {
-        fprintf(stderr, "%s:%d: create window failed: %s\n",
-            __FILE__, __LINE__, SDL_GetError());
-        exit(EXIT_FAILURE);
-    }
-
-    SDL_GLContext mainGLContext = SDL_GL_CreateContext(window);
-    if (mainGLContext == 0) {
-        fprintf(stderr, "%s:%d: create context failed: %s\n",
-            __FILE__, __LINE__, SDL_GetError());
-        exit(EXIT_FAILURE);
-    }
-
-    int w, h;
-    SDL_GetWindowSize(window, &w, &h);
-    reshape(w, h);
-
-    return 0;
-}
-
-int main(int argc, char** argv) //done
-{
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "%s:%d: unable to init SDL: %s\n",
-            __FILE__, __LINE__, SDL_GetError());
-        exit(EXIT_FAILURE);
-    }
-
-    // Set up the window and OpenGL rendering context 
-    if (initGraphics()) {
-        SDL_Quit();
-        return EXIT_FAILURE;
-    }
-
-    // OpenGL initialisation, must be done before any OpenGL calls
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitWindowSize(1024, 1024);
+    glutInitWindowPosition(100, 100);
+    glutCreateWindow(argv[0]);
     init();
-
-    atexit(sys_shutdown);
-
-    mainLoop();
-
+    glutDisplayFunc(display);
+    glutReshapeFunc(reshape);
+    glutIdleFunc(idle);
+    glutKeyboardFunc(keyboard);
+    glutMouseFunc(mouse);
+    glutMotionFunc(motion);
+    glutMainLoop();
     return 0;
 }
