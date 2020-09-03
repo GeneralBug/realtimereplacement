@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <math.h>
+#include <list>
 
 #if _WIN32
 #   include <Windows.h>
@@ -16,7 +17,7 @@
 
 #   include <OpenGL/gl.h>
 #   include <OpenGL/glu.h>
-#   include <GLUT/glut.h>
+//#   include <GLUT/glut.h>
 
 
 #else
@@ -33,22 +34,9 @@
 #include <glm/gtc/constants.hpp>
 #include <SDL.h>
 
-
-typedef enum {
-    d_drawSineWave,
-    d_mouse,
-    d_key,
-    d_animation,
-    d_lighting,
-    d_OSD,
-    d_matrices,
-    d_computeLighting,
-    d_nflags
-} DebugFlags;
-
-bool debug[d_nflags] = { false, false, false, false, false, false, false, false };
-//bool debug = false;
-typedef struct { float r, g, b; } color3f;
+#define vertecies 0
+#define normals 1
+#define offsetBuffer 2
 
 typedef enum { line, fill } polygonMode_t;
 typedef enum { grid, wave } shape_t;
@@ -72,8 +60,9 @@ typedef struct {
     bool displayOSD;
     bool consolePM;
     bool multiView;
+    bool vbo;
 } Global;
-Global g = { grid, false, 0.0, 0.0, line, true, false, false, false, 0, 0, 8, 2, 0, 0.0, 1.0, 0, false, false, false };
+Global g = { grid, false, 0.0, 0.0, line, true, false, false, false, 0, 0, 8, 2, 0, 0.0, 1.0, 0, false, false, false, false };
 
 typedef enum { inactive, rotate, pan, zoom } CameraControl;
 
@@ -104,6 +93,25 @@ void display();
 void displayMultiView();
 
 int err;
+
+GLuint buffers[3];
+
+static glm::vec3 *vertex = NULL;
+static glm::vec3 *normal = NULL;
+static int *indicies = NULL;
+static GLvoid **offset = NULL;
+
+//static std::list<glm::vec3> vertex;
+//static std::list<glm::vec3> normal;
+//static std::list<int> indicies;
+
+//static glm::vec3 vertex[(g.tess + 1) g.tess * 2];
+//static glm::vec3 normal[g.tess * 2];
+//static int indices[g.tess * 2];
+
+int prevDim = 0;
+int prevTess = 0;
+bool prevLighting = false;
 
 void quit(int code) //done
 {
@@ -290,12 +298,6 @@ void consolePM()
  */
 glm::vec3 computeLighting(glm::vec3& rEC, glm::vec3& nEC)
 {
-    if (debug[d_computeLighting]) {
-        printf("rEC ");
-        printVec(&rEC[0], 3);
-        printf("nEC ");
-        printVec(&nEC[0], 3);
-    }
 
     // Used to accumulate ambient, diffuse and specular contributions
     // Note: it is a vec3 being constructed with a single value which
@@ -358,9 +360,38 @@ glm::vec3 computeLighting(glm::vec3& rEC, glm::vec3& nEC)
     return color;
 }
 
+void drawNormals() {
+    const float A1 = 0.25, k1 = 2.0 * 3.14, w1 = 0.25;
+    const float A2 = 0.25, k2 = 2.0 * 3.14, w2 = 0.25;
+    float stepSize = 2.0 / g.tess;
+    glm::vec3 r, n, rEC, nEC;
+    float t = g.t;
+
+    for (int j = 0; j <= g.tess; j++) {
+        for (int i = 0; i <= g.tess; i++) {
+            r.x = -1.0 + i * stepSize;
+            r.z = -1.0 + j * stepSize;
+
+            n.y = 1.0;
+            n.x = -A1 * k1 * cosf(k1 * r.x + w1 * t);
+            if (g.waveDim == 2) {
+                r.y = A1 * sinf(k1 * r.x + w1 * t);
+                n.z = 0.0;
+            }
+            else {
+                r.y = A1 * sinf(k1 * r.x + w1 * t) + A2 * sinf(k2 * r.z + w2 * t);
+                n.z = -A2 * k2 * cosf(k2 * r.z + w2 * t);
+            }
+
+            rEC = glm::vec3(modelViewMatrix * glm::vec4(r, 1.0));
+            nEC = normalMatrix * glm::normalize(n);
+            drawVector(rEC, nEC, 0.05, true, yellow);
+        }
+    }
+}
+
 void drawGrid(int tess)
 {
-    //TODO: glut
     float stepSize = 2.0 / tess;
     glm::vec3 r, n, rEC, nEC;
     int i, j;
@@ -459,12 +490,215 @@ void drawGrid(int tess)
     }
 }
 
+void updateOffset() {
+    for (int i = 0; i < g.tess; i++) {
+        offset[i] = (GLvoid *) (i * (g.tess+1) * 2 * sizeof(GLuint));
+    }
+}
 
+void updateIndicies() {
+    int index = 0;
+
+    for (int i = 0; i < g.tess; i++) {
+        for (int j = 0; j < (g.tess + 1); j++) {
+            indicies[index] = (i * (g.tess + 1)) + j;
+            index++;
+            indicies[index] = ((i + 1) * (g.tess + 1)) + j;
+            index++;
+        }
+
+        i++;
+
+        for (int j = g.tess; j >= 0; j--) {
+            indicies[index] = ((i + 1) * (g.tess + 1)) + j;
+            index++;
+            indicies[index] = (i * (g.tess + 1)) + j;
+            index++;
+        }
+    }
+}
+
+void updateNormals() {
+    int index = 0;
+    float t = g.t;
+    const float A2 = 0.25, k2 = 2.0 * M_PI, w2 = 0.25;
+    const float A1 = 0.25, k1 = 2.0 * M_PI, w1 = 0.25;
+
+    if (g.waveDim == 2) {
+        for (int i = 0; i <= g.tess; i++) {
+            for (int j = 0; j <= g.tess; j++) {
+                normal[index].x = -A1 * k1 * cosf(k1 * vertex[index].x + w1 * t);
+                normal[index].y = 1.0f;
+                normal[index].z = 0.0f;
+
+                glm::vec3 normalMath = normalMatrix * glm::normalize(normal[index]);
+                if (g.fixed) {
+                    normal[index] = normalMath;
+                } else {
+                    glm::vec3 compute = computeLighting(vertex[index], normalMath);
+                    normal[index] = compute;
+                }
+
+                index++;
+            }
+        }
+    } else if (g.waveDim == 3) {
+        for (int i = 0; i <= g.tess; i++) {
+            for (int j = 0; j <= g.tess; j++) {
+                normal[index].x = -A1 * k1 * cosf(k1 * vertex[index].x + w1 * t);
+                normal[index].y = 1.0f;
+                normal[index].z = -A2 * k2 * cosf(k2 * vertex[index].z + w2 * t);
+
+                glm::vec3 normalMath = normalMatrix * glm::normalize(normal[index]);
+                if (g.fixed) {
+                    normal[index] = normalMath;
+                } else {
+                    glm::vec3 compute = computeLighting(vertex[index], normalMath);
+                    normal[index] = compute;
+                }
+
+                index++;
+            }
+        }
+    }
+}
+
+void updateVertex() {
+    int index = 0;
+    float t = g.t;
+    float stepSize = 2.0f / (float) g.tess;
+    const float A2 = 0.25, k2 = 2.0 * M_PI, w2 = 0.25;
+    const float A1 = 0.25, k1 = 2.0 * M_PI, w1 = 0.25;
+
+    if (g.waveDim == 2) {
+        for (int i = 0; i <= g.tess; i++) {
+            for (int j = 0; j <= g.tess; j++) {
+                vertex[index].x = -1.0f + j * stepSize;
+                vertex[index].y = A1 * sinf(k1 * vertex[index].x + w1 * t);
+                vertex[index].z = -1.0f + i * stepSize;
+
+                vertex[index] = glm::vec3(modelViewMatrix * glm::vec4(vertex[index], 1.0));
+                index++;
+            }
+        }
+    } else if (g.waveDim == 3) {
+        for (int i = 0; i <= g.tess; i++) {
+            for (int j = 0; j <= g.tess; j++) {
+                vertex[index].x = -1.0f + j * stepSize;
+                vertex[index].z = -1.0f + i * stepSize;
+                vertex[index].y = A1 * sinf(k1 * vertex[index].x + w1 * t) + A2 * sinf(k2 * vertex[index].z + w2 * t);
+
+                vertex[index] = glm::vec3(modelViewMatrix * glm::vec4(vertex[index], 1.0));
+                index++;
+            }
+        }
+    }
+}
+
+void allocateVertex() {
+    auto *tempVertex = (glm::vec3 * ) realloc(vertex, (g.tess+1) * (g.tess+1) * sizeof(glm::vec3));
+    vertex = tempVertex;
+}
+
+void allocateNormals() {
+    auto *tempNormal = (glm::vec3 *) realloc(normal, (g.tess+1) * (g.tess+1) * sizeof(glm::vec3));
+    normal = tempNormal;
+}
+
+void allocateIndicies() {
+    auto *tempindicies = (int *) realloc(indicies, (g.tess+1) * g.tess * 2 * sizeof(int));
+    indicies = tempindicies;
+}
+
+void allocateOffset() {
+    auto **tempOffset = (GLvoid **) realloc(offset, g.tess * sizeof(GLvoid *));
+    offset = tempOffset;
+}
+
+void updateBuffers() {
+    glBindBuffer(GL_ARRAY_BUFFER, buffers[vertecies]);
+    glBufferData(GL_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(glm::vec3), vertex, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffers[normals]);
+    glBufferData(GL_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(glm::vec3), normal, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[offsetBuffer]);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(int), indicies, GL_STATIC_DRAW);
+
+}
+
+void updateSineWave() {
+    // Allocate memory
+    allocateVertex();
+    allocateNormals();
+    allocateIndicies();
+    allocateOffset();
+
+    // Update all VBO data
+    updateIndicies();
+    updateOffset();
+    updateVertex();
+
+    if (g.lighting) {
+        updateNormals();
+    }
+
+    // Update all buffers
+    updateBuffers();
+}
+
+void drawSineWaveVBO(int tess) {
+    glPushAttrib(GL_CURRENT_BIT);
+    glPushMatrix();
+
+    if (g.lighting) {
+        glEnable(GL_NORMALIZE);
+        glEnable(GL_LIGHTING);
+        glEnable(GL_LIGHT0);
+        glShadeModel(GL_SMOOTH);
+        glMaterialfv(GL_FRONT, GL_SPECULAR, &white[0]);
+        glMaterialf(GL_FRONT, GL_SHININESS, shininess);
+        glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
+    } else {
+        glDisable(GL_LIGHTING);
+        glColor3fv(&cyan[0]);
+    }
+
+    if (g.polygonMode == line) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    } else {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    }
+
+    // VBO Sine wave?
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffers[vertecies]);
+    glVertexPointer(3, GL_FLOAT, 0, nullptr);
+    glBindBuffer(GL_ARRAY_BUFFER, buffers[normals]);
+    glNormalPointer(GL_FLOAT, 0, nullptr);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[offsetBuffer]);
+
+    for(int i = 0; i < g.tess; i++) {
+        glDrawElements(GL_TRIANGLE_STRIP, (g.tess+1)*2 , GL_UNSIGNED_INT, offset[i]);
+    }
+
+
+    if (g.lighting) {
+        glDisable(GL_LIGHTING);
+    }
+
+    if (g.drawNormals) {
+        drawNormals();
+    }
+
+    glPopAttrib();
+    glPopMatrix();
+}
 
 void drawSineWave(int tess)
 {
-    const float A1 = 0.25, k1 = 2.0 * 3.14, w1 = 0.25;
-    const float A2 = 0.25, k2 = 2.0 * 3.14, w2 = 0.25;
+    const float A1 = 0.25, k1 = 2.0 * M_PI, w1 = 0.25;
+    const float A2 = 0.25, k2 = 2.0 * M_PI, w2 = 0.25;
     float stepSize = 2.0 / tess;
     glm::vec3 r, n, rEC, nEC;
     int i, j;
@@ -492,7 +726,7 @@ void drawSineWave(int tess)
 
     // Sine wave
     for (j = 0; j < tess; j++) {
-        glBegin(GL_QUAD_STRIP);
+        glBegin(GL_TRIANGLE_STRIP);
         for (i = 0; i <= tess; i++) {
             r.x = -1.0 + i * stepSize;
             r.z = -1.0 + j * stepSize;
@@ -561,27 +795,7 @@ void drawSineWave(int tess)
 
     // Normals
     if (g.drawNormals) {
-        for (j = 0; j <= tess; j++) {
-            for (i = 0; i <= tess; i++) {
-                r.x = -1.0 + i * stepSize;
-                r.z = -1.0 + j * stepSize;
-
-                n.y = 1.0;
-                n.x = -A1 * k1 * cosf(k1 * r.x + w1 * t);
-                if (g.waveDim == 2) {
-                    r.y = A1 * sinf(k1 * r.x + w1 * t);
-                    n.z = 0.0;
-                }
-                else {
-                    r.y = A1 * sinf(k1 * r.x + w1 * t) + A2 * sinf(k2 * r.z + w2 * t);
-                    n.z = -A2 * k2 * cosf(k2 * r.z + w2 * t);
-                }
-
-                rEC = glm::vec3(modelViewMatrix * glm::vec4(r, 1.0));
-                nEC = normalMatrix * glm::normalize(n);
-                drawVector(rEC, nEC, 0.05, true, yellow);
-            }
-        }
+        drawNormals();
     }
 
     while ((err = glGetError()) != GL_NO_ERROR) {
@@ -593,7 +807,6 @@ void drawSineWave(int tess)
 
 void idle()
 {
-    //TODO: glut
     float t, dt;
 
     t = SDL_GetTicks() / milli;
@@ -603,16 +816,12 @@ void idle()
         dt = t - g.lastT;
         g.t += dt;
         g.lastT = t;
-        if (debug[d_animation])
-            printf("idle: animate %f\n", g.t);
     }
 
     // Update stats, although could make conditional on a flag set interactively
     dt = (t - g.lastStatsDisplayT);
     if (dt > g.displayStatsInterval) {
         g.frameRate = g.frameCount / dt;
-        if (debug[d_OSD])
-            printf("dt %f framecount %d framerate %f\n", dt, g.frameCount, g.frameRate);
         g.lastStatsDisplayT = t;
         g.frameCount = 0;
     }
@@ -627,14 +836,26 @@ void displayMultiView() //done
     glm::mat4 modelViewMatrixSave(modelViewMatrix);
     glm::mat3 normalMatrixSave(normalMatrix);
 
+    if (g.animate || prevDim!= g.waveDim || prevLighting!= g.lighting || prevTess!= g.tess) {
+        updateSineWave();
+        prevDim = g.waveDim;
+        prevLighting = g.lighting;
+        prevTess = g.tess;
+    }
+
     // Front view
     modelViewMatrix = glm::mat4(1.0);
     glViewport(g.width / 16.0, g.height * 9.0 / 16.0, g.width * 6.0 / 16.0, g.height * 6.0 / 16.0);
     drawAxes(5.0);
     if (g.shape == grid)
         drawGrid(g.tess);
-    else
-        drawSineWave(g.tess);
+    else {
+        if (!g.vbo) {
+            drawSineWave(g.tess);
+        } else {
+            drawSineWaveVBO(g.tess);
+        }
+    }
 
 
     // Top view
@@ -644,8 +865,13 @@ void displayMultiView() //done
     drawAxes(5.0);
     if (g.shape == grid)
         drawGrid(g.tess);
-    else
-        drawSineWave(g.tess);
+    else {
+        if (!g.vbo) {
+            drawSineWave(g.tess);
+        } else {
+            drawSineWaveVBO(g.tess);
+        }
+    }
 
     // Left view
     modelViewMatrix = glm::mat4(1.0);
@@ -654,8 +880,13 @@ void displayMultiView() //done
     drawAxes(5.0);
     if (g.shape == grid)
         drawGrid(g.tess);
-    else
-        drawSineWave(g.tess);
+    else {
+        if (!g.vbo) {
+            drawSineWave(g.tess);
+        } else {
+            drawSineWaveVBO(g.tess);
+        }
+    }
 
     // General view
     modelViewMatrix = glm::rotate(modelViewMatrix, camera.rotateX * glm::pi<float>() / 180.0f, glm::vec3(1.0, 0.0, 0.0));
@@ -666,8 +897,14 @@ void displayMultiView() //done
     drawAxes(5.0);
     if (g.shape == grid)
         drawGrid(g.tess);
-    else
-        drawSineWave(g.tess);
+    else {
+        if (!g.vbo) {
+            drawSineWave(g.tess);
+        } else {
+            drawSineWaveVBO(g.tess);
+        }
+    }
+
 
     //if (g.displayOSD)
     //    displayOSD();
@@ -691,6 +928,13 @@ void display() //done
 
     // General view
 
+    if (g.animate || prevDim!= g.waveDim || prevLighting!= g.lighting || prevTess!= g.tess) {
+        updateSineWave();
+        prevDim = g.waveDim;
+        prevLighting = g.lighting;
+        prevTess = g.tess;
+    }
+
     modelViewMatrix = glm::mat4(1.0);
     normalMatrix = glm::mat3(1.0);
 
@@ -700,18 +944,17 @@ void display() //done
 
     normalMatrix = glm::transpose(glm::inverse(glm::mat3(modelViewMatrix)));
 
-    if (debug[d_matrices]) {
-        printf("modelViewMatrix\n");
-        printMatrixColumnMajor(&modelViewMatrix[0][0], 4);
-        printf("normalMatrix\n");
-        printMatrixColumnMajor(&normalMatrix[0][0], 3);
-    }
 
     drawAxes(5.0);
     if (g.shape == grid)
         drawGrid(g.tess);
-    else
-        drawSineWave(g.tess);
+    else {
+        if (!g.vbo) {
+            drawSineWave(g.tess);
+        } else {
+            drawSineWaveVBO(g.tess);
+        }
+    }
 
     //if (g.displayOSD)
     //    displayOSD();
@@ -802,7 +1045,8 @@ void keyDown(SDL_KeyboardEvent *e)
         postRedisplay();
         break;
     case SDLK_v:
-        printf("vbos not implemented\n");//TODO
+        printf("v; toggling VBO\n");
+        g.vbo = !g.vbo;
         break;
     case SDLK_F1:
         printf("increasing tesselation\n");
@@ -830,9 +1074,6 @@ void keyDown(SDL_KeyboardEvent *e)
 
 void mouse(int button, int x, int y)
 {
-    if (debug[d_mouse])
-        printf("mouse: %d %d %d\n", button, x, y);
-
     camera.lastX = x;
     camera.lastY = y;
 
@@ -854,12 +1095,6 @@ void mouse(int button, int x, int y)
 void motion(int x, int y)
 {
     float dx, dy;
-
-    if (debug[d_mouse]) {
-        printf("motion: %d %d\n", x, y);
-        printf("camera.rotate: %f %f\n", camera.rotateX, camera.rotateY);
-        printf("camera.scale:%f\n", camera.scale);
-    }
 
     dx = x - camera.lastX;
     dy = y - camera.lastY;
@@ -894,8 +1129,6 @@ void eventDispatcher()
         switch (e.type) 
         {
             case SDL_QUIT:
-                if (debug)
-                    printf("Quit\n");
                 quit(0);
                 break;
             case SDL_MOUSEMOTION:
@@ -911,22 +1144,14 @@ void eventDispatcher()
                 keyDown(&e.key);
                 break;
             case SDL_WINDOWEVENT:
-                if (debug)
-                    printf("Window event %d\n", e.window.event);
                 switch (e.window.event)
                 {
                     case SDL_WINDOWEVENT_SHOWN:
-                        if (debug)
-                            SDL_Log("Window %d shown", e.window.windowID);
                         break;
                     case SDL_WINDOWEVENT_SIZE_CHANGED:
-                        if (debug)
-                            printf("SDL_WINDOWEVENT_SIZE_CHANGED\n");
                         break;
                     case SDL_WINDOWEVENT_RESIZED:
-                        if (debug)
-                            printf("SDL_WINDOWEVENT_RESIZED.\n");
-                        if (e.window.windowID == SDL_GetWindowID(window)) 
+                        if (e.window.windowID == SDL_GetWindowID(window))
                         {
                             SDL_SetWindowSize(window, e.window.data1, e.window.data2);
                             reshape(e.window.data1, e.window.data2);
@@ -934,8 +1159,6 @@ void eventDispatcher()
                         }
                         break;
                     case SDL_WINDOWEVENT_CLOSE:
-                        if (debug)
-                            printf("Window close event\n");
                         break;
                     default:
                         break;
@@ -1002,6 +1225,13 @@ int initGraphics()
     return 0;
 }
 
+void initVBO() {
+    glGenBuffers(3, buffers);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_NORMAL_ARRAY);
+
+}
+
 int main(int argc, char** argv) //done
 {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -1018,6 +1248,7 @@ int main(int argc, char** argv) //done
 
     // OpenGL initialisation, must be done before any OpenGL calls
     init();
+    initVBO();
 
     atexit(sys_shutdown);
 
