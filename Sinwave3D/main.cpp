@@ -9,9 +9,21 @@
 #include <stdio.h>
 #include <math.h>
 
-#include <GL/glut.h>
-#include <GL/glu.h>
-#include <GL/gl.h>
+#if _WIN32
+#   include <Windows.h>
+#endif
+#if __APPLE__
+
+#   include <OpenGL/gl.h>
+#   include <OpenGL/glu.h>
+#   include <GLUT/glut.h>
+
+
+#else
+#   include <GL/gl.h>
+#   include <GL/glu.h>
+#   include <GL/glut.h>
+#endif
 
 
 #define GLM_FORCE_RADIANS
@@ -816,29 +828,27 @@ void keyDown(SDL_KeyboardEvent *e)
     }
 }
 
-void mouse(int button, int state, int x, int y)
+void mouse(int button, int x, int y)
 {
-    //TODO: glut
     if (debug[d_mouse])
         printf("mouse: %d %d %d\n", button, x, y);
 
     camera.lastX = x;
     camera.lastY = y;
 
-    if (state == GLUT_DOWN)
-        switch (button) {
-        case GLUT_LEFT_BUTTON:
+    switch(button) {
+        case SDL_BUTTON_LEFT:
             camera.control = rotate;
             break;
-        case GLUT_MIDDLE_BUTTON:
+        case SDL_BUTTON_MIDDLE:
             camera.control = pan;
             break;
-        case GLUT_RIGHT_BUTTON:
+        case SDL_BUTTON_RIGHT:
             camera.control = zoom;
             break;
-        }
-    else if (state == GLUT_UP)
-        camera.control = inactive;
+        default:
+            break;
+    }
 }
 
 void motion(int x, int y)
@@ -889,14 +899,13 @@ void eventDispatcher()
                 quit(0);
                 break;
             case SDL_MOUSEMOTION:
-                //if (debug)
-                //    printf("Mouse moved by %d,%d to (%d,%d)\n",
-                //e.motion.xrel, e.motion.yrel, e.motion.x, e.motion.y);
+                motion(e.motion.x, e.motion.y);
                 break;
             case SDL_MOUSEBUTTONDOWN:
-                //if (debug)
-                //    printf("Mouse button %d pressed at (%d,%d)\n",
-                //e.button.button, e.button.x, e.button.y);
+                mouse(e.button.button, e.button.x, e.button.y);
+                break;
+            case SDL_MOUSEBUTTONUP:
+                camera.control = inactive;
                 break;
             case SDL_KEYDOWN:
                 keyDown(&e.key);
