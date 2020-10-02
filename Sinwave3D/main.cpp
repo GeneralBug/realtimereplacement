@@ -624,7 +624,7 @@ void updateBuffers() {
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[offsetBuffer]);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(int), indicies, GL_STATIC_DRAW);
-
+    return;
 }
 
 void updateSineWave() {
