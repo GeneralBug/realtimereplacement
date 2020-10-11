@@ -618,17 +618,17 @@ void allocateOffset() {
     offset = tempOffset;
 }
 
-void updateBuffers() {
-    glBindBuffer(GL_ARRAY_BUFFER, buffers[vertecies]);
-    glBufferData(GL_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(glm::vec3), vertex, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, buffers[normals]);
-    glBufferData(GL_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(glm::vec3), normal, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[offsetBuffer]);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(int), indicies, GL_STATIC_DRAW);
-
-}
+//void updateBuffers() {
+//    glBindBuffer(GL_ARRAY_BUFFER, buffers[vertecies]);
+//    glBufferData(GL_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(glm::vec3), vertex, GL_STATIC_DRAW);
+//
+//    glBindBuffer(GL_ARRAY_BUFFER, buffers[normals]);
+//    glBufferData(GL_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(glm::vec3), normal, GL_STATIC_DRAW);
+//
+//    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[offsetBuffer]);
+//    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(int), indicies, GL_STATIC_DRAW);
+//    return;
+//}
 
 void updateSineWave() {
     // Allocate memory
@@ -647,7 +647,7 @@ void updateSineWave() {
     }
 
     // Update all buffers
-    updateBuffers();
+    //updateBuffers();
 }
 
 void drawSineWaveVBO(int tess) {
@@ -675,11 +675,11 @@ void drawSineWaveVBO(int tess) {
 
     // VBO Sine wave?
 
-    glBindBuffer(GL_ARRAY_BUFFER, buffers[vertecies]);
+    //glBindBuffer(GL_ARRAY_BUFFER, buffers[vertecies]);
     glVertexPointer(3, GL_FLOAT, 0, nullptr);
-    glBindBuffer(GL_ARRAY_BUFFER, buffers[normals]);
+    //glBindBuffer(GL_ARRAY_BUFFER, buffers[normals]);
     glNormalPointer(GL_FLOAT, 0, nullptr);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[offsetBuffer]);
+    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[offsetBuffer]);
 
     for(int i = 0; i < g.tess; i++) {
         glDrawElements(GL_TRIANGLE_STRIP, (g.tess+1)*2 , GL_UNSIGNED_INT, offset[i]);
@@ -1229,7 +1229,7 @@ int initGraphics()
 }
 
 void initVBO() {
-    glGenBuffers(3, buffers);
+    //glGenBuffers(3, buffers);
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_NORMAL_ARRAY);
 
