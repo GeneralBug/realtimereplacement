@@ -17,12 +17,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <SDL.h>
 
 #include "shaders.h"
 
 #ifdef _WIN32
 #pragma warning(disable:4996)
 #endif
+
 
 int oglError(int line, const char* file)
 {
@@ -117,6 +119,9 @@ void cleanupShader(GLuint vert, GLuint frag, char *vertSrc, char *fragSrc)
 
 GLuint getShader(const char* vertexFile, const char* fragmentFile)
 {
+    //GLEW STUFF
+    GLenum err = glewInit();
+
   char* vertSrc;
   char* fragSrc;
 

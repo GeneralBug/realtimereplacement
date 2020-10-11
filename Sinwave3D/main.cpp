@@ -12,6 +12,7 @@
 
 #if _WIN32
 #   include <Windows.h>
+#	include <GL/glew.h>
 #endif
 #if __APPLE__
 
@@ -33,6 +34,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/constants.hpp>
 #include <SDL.h>
+#include "shaders.h"
 
 #define vertecies 0
 #define normals 1
@@ -40,6 +42,12 @@
 
 typedef enum { line, fill } polygonMode_t;
 typedef enum { grid, wave } shape_t;
+
+//SHADERS!
+GLuint shaderProgram;
+const char *vert = "shader.vert";
+const char *frag = "shader.frag";
+
 
 typedef struct {
     shape_t shape;
@@ -168,8 +176,13 @@ void init(void) //done
     glEnable(GL_DEPTH_TEST);
     glShadeModel(GL_FLAT);
     glColor3f(1.0, 1.0, 1.0);
-
     displayFunc = &display;
+
+    GLenum err = glewInit();
+
+    //shaders
+    shaderProgram = getShader(vert, frag);
+    glUseProgram(shaderProgram); //need glew to run this? not recognised by SDL
 }
 
 void reshape(int w, int h) //done
@@ -618,17 +631,17 @@ void allocateOffset() {
     offset = tempOffset;
 }
 
-//void updateBuffers() {
-//    glBindBuffer(GL_ARRAY_BUFFER, buffers[vertecies]);
-//    glBufferData(GL_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(glm::vec3), vertex, GL_STATIC_DRAW);
-//
-//    glBindBuffer(GL_ARRAY_BUFFER, buffers[normals]);
-//    glBufferData(GL_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(glm::vec3), normal, GL_STATIC_DRAW);
-//
-//    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[offsetBuffer]);
-//    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(int), indicies, GL_STATIC_DRAW);
-//    return;
-//}
+void updateBuffers() {
+    glBindBuffer(GL_ARRAY_BUFFER, buffers[vertecies]);
+    glBufferData(GL_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(glm::vec3), vertex, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffers[normals]);
+    glBufferData(GL_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(glm::vec3), normal, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[offsetBuffer]);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (g.tess+1) * (g.tess+1) * sizeof(int), indicies, GL_STATIC_DRAW);
+    return;
+}
 
 void updateSineWave() {
     // Allocate memory
@@ -647,7 +660,7 @@ void updateSineWave() {
     }
 
     // Update all buffers
-    //updateBuffers();
+    updateBuffers();
 }
 
 void drawSineWaveVBO(int tess) {
@@ -675,11 +688,11 @@ void drawSineWaveVBO(int tess) {
 
     // VBO Sine wave?
 
-    //glBindBuffer(GL_ARRAY_BUFFER, buffers[vertecies]);
+    glBindBuffer(GL_ARRAY_BUFFER, buffers[vertecies]);
     glVertexPointer(3, GL_FLOAT, 0, nullptr);
-    //glBindBuffer(GL_ARRAY_BUFFER, buffers[normals]);
+    glBindBuffer(GL_ARRAY_BUFFER, buffers[normals]);
     glNormalPointer(GL_FLOAT, 0, nullptr);
-    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[offsetBuffer]);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[offsetBuffer]);
 
     for(int i = 0; i < g.tess; i++) {
         glDrawElements(GL_TRIANGLE_STRIP, (g.tess+1)*2 , GL_UNSIGNED_INT, offset[i]);
@@ -1229,7 +1242,7 @@ int initGraphics()
 }
 
 void initVBO() {
-    //glGenBuffers(3, buffers);
+    glGenBuffers(3, buffers);
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_NORMAL_ARRAY);
 
