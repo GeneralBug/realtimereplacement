@@ -96,10 +96,10 @@ int err;
 
 GLuint buffers[3];
 
-static glm::vec3 *vertex = NULL;
-static glm::vec3 *normal = NULL;
-static int *indicies = NULL;
-static GLvoid **offset = NULL;
+static glm::vec3 *vertex = nullptr;
+static glm::vec3 *normal = nullptr;
+static int *indicies = nullptr;
+static GLvoid **offset = nullptr;
 
 //static std::list<glm::vec3> vertex;
 //static std::list<glm::vec3> normal;
@@ -112,6 +112,9 @@ static GLvoid **offset = NULL;
 int prevDim = 0;
 int prevTess = 0;
 bool prevLighting = false;
+
+int numLights = 8;
+
 
 void quit(int code) //done
 {
@@ -491,7 +494,7 @@ void drawGrid(int tess)
 }
 
 void updateOffset() {
-    for (int i = 0; i < g.tess; i++) {
+    for (int i = 0; i < g.tess + 1; i++) {
         offset[i] = (GLvoid *) (i * (g.tess+1) * 2 * sizeof(GLuint));
     }
 }
@@ -611,7 +614,7 @@ void allocateIndicies() {
 }
 
 void allocateOffset() {
-    auto **tempOffset = (GLvoid **) realloc(offset, g.tess * sizeof(GLvoid *));
+    auto **tempOffset = (GLvoid **) realloc(offset, g.tess * 2 * sizeof(GLvoid *));
     offset = tempOffset;
 }
 
