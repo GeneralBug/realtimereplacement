@@ -1,8 +1,9 @@
 ﻿/* ===========================================
- * FROGGER WITH OPENGL/GLUT
+ * FROGGER WITH SDL2/GLSL
  * CONTAINS LOTS OF STUFF
- * AUTHOR: HARRISON ELLEM, S3718372
- * BASED ON TUTORIALS AND STUFF BY GEOFF LEACH
+ * AUTHOR: HARRISON ELLEM, BENJAMIN SPECHT
+ * BASED ON FROGGER GLUT STUFF BY HARRISON ELLEM, 
+	WHICH IS BASED ON TUTORIALS AND STUFF BY GEOFF LEACH
  * =========================================== */
 #include "main.h"
 
@@ -99,8 +100,6 @@ void postRedisplay() //done
 void init() //done
 {
 	glClearColor(0.0, 0.0, 0.0, 1.0);
-	if (g.twoside)
-		glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
 	glEnable(GL_DEPTH_TEST);
 	glShadeModel(GL_FLAT);
 	glColor3f(1.0, 1.0, 1.0);
@@ -160,44 +159,6 @@ void drawCar(float scale, vec3f pos)
 
 void drawFrog(float scale)
 {
-	/*
-
-
-
-	vec2f arm_right;
-	vec2f arm_left;
-	vec2f leg_right;
-	vec2f leg_left;
-	vec3f origin = {0,0,0};
-	drawSphere(origin, scale, 64, 64);
-	*/
-
-	//IMPORTANT - DRAWING SPHERE
-	/*
-	float angle;
-	glPushMatrix();
-	//pivot point
-	glTranslatef(frog.r.x, -1*frog.r.y, frog.r.z);
-	//rotation - uses actual velocity if moving
-	if(g.stationary)
-	{
-		angle = atan(frog.v0.y/(frog.v0.x + 0.001)) * 180/M_PI;
-		glRotatef(angle - 90, 0, 0, 1);
-	}
-	else
-	{
-		angle = atan(frog.v.y/(frog.v.x + 0.001)) * 180/M_PI;
-		glRotatef(angle -90, 0, 0, 1);
-	}
-	//frog position, flips if going backwards
-	if(frog.v0.x < 0)
-		glTranslatef(0, -1*frog.radius, 0);
-	else
-		glTranslatef(0, frog.radius, 0);
-	//scale, makes it an ellipse
-	glScalef(0.6f * scale, 1.0f * scale, 0.6f * scale);
-	//actual circle
-	*/
 	float colour[] = { 0, 1, 0.5 };
 	if (g.dead)
 	{
@@ -209,36 +170,6 @@ void drawFrog(float scale)
 	glColor3f(colour[0], colour[1], colour[2]);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, colour);
 	drawSphere(origin, scale, g.tess, g.tess);
-
-	//glPopMatrix();
-
-	/*
-	glPushMatrix();//TORSO
-		//translate to frog position
-		glTranslatef(0, 0, 0);
-		//render torso
-		//glutWireCube(scale);
-		glPushMatrix();//NECK
-			//translate to neck
-			glTranslatef(1, 0, 0);
-			//neck rotations for animation go here
-
-			glPushMatrix();//HEAD
-				//translate to centre of head
-				glTranslatef(0.5, 0, 0);
-				//render head
-				//glutWireCube(scale);
-			glPopMatrix();
-		glPopMatrix();
-
-		drawLimb(arm_right);
-		drawLimb(arm_left);
-		drawLimb(leg_right);
-		drawLimb(leg_left);
-
-	glPopMatrix();
-	*/
-
 }
 
 void drawGrid(int gridSize, float scale, bool wave, vec3f colour)
@@ -287,15 +218,15 @@ void drawGrid(int gridSize, float scale, bool wave, vec3f colour)
 			if (wave)
 			{
 
-				coords_left.y = amp * sinf((k * coords_left.x) + (M_PI / 4) * noise);
-				coords_right.y = amp * sinf((k * coords_right.x) + (M_PI / 4) * noise);
+				coords_left.y = amp * sin((float)((k * coords_left.x) + (M_PI / 4) * noise));
+				coords_right.y = amp * sin((float)((k * coords_right.x) + (M_PI / 4) * noise));
 				//part that makes the logs bob, doesn't work
 				for (l = 0; l < LOG_COUNT; l++)
 				{
 					if ((logs[l].x >= coords_left.x - LOG_RADIUS && logs[l].x <= coords_right.x + LOG_RADIUS)
 						)//	|| (logs[l].x >= coords_right.x && logs[l].x <= coords_right.x ))
 					{
-						printf("adjusting log height\n");
+						std::cout << ("adjusting log height\n");
 						logs[l].y = coords_left.y;
 					}
 				}
@@ -368,10 +299,10 @@ bool magnitude(float scale)
 float getNextTime(float time, float final_time)
 {
 	if (g.debug)
-		printf("in time: %f\n", time);
+		std::cout << ("in time: %f\n", time);
 	time = time + (final_time / g.tess);
 	if (g.debug)
-		printf("out time: %f\n", time);
+		std::cout << ("out time: %f\n", time);
 	return time;
 }
 
@@ -559,8 +490,8 @@ void drawQuadratic()
 		}
 		if (g.debug)
 		{
-			printf("===================\n");
-			printf("X: %f Y: %f Z: %f T: %f\n", next.x, next.y, next.z, t);
+			std::cout << ("===================\n");
+			std::cout << ("X: %f Y: %f Z: %f T: %f\n", next.x, next.y, next.z, t);
 		}
 	}
 	glEnd();
@@ -646,6 +577,31 @@ void drawEnvironment()
 
 }
 
+void idle()
+{
+	//TODO: not sure if converted properly
+	float t, dt;
+
+	t = SDL_GetTicks() / milli;
+
+	// Accumulate time if animation enabled
+	if (g.animate) {
+		dt = t - g.time;
+		g.t += dt;
+		g.time = t;
+	}
+
+	// Update stats, although could make conditional on a flag set interactively
+	dt = (t - g.lastFrameRateT);
+	if (dt > g.frameRateInterval) {
+		g.frameRate = g.frames / dt;
+		g.lastFrameRateT = t;
+		g.frames = 0;
+	}
+
+	postRedisplay();
+}
+
 void keyDown(SDL_KeyboardEvent* e)
 {
 	/*
@@ -683,19 +639,19 @@ void keyDown(SDL_KeyboardEvent* e)
 		//TODO: add tess limit
 		g.tess *= 2;
 		if (g.debug)
-			printf("increasing tess: %f\n", g.tess);
+			std::cout << ("increasing tess: %f\n", g.tess);
 		break;
 	case SDLK_F2:
 		if (g.tess > 4)
 			g.tess /= 2;
 
 		if (g.debug)
-			printf("reducing tess: %f\n", g.tess);
+			std::cout << ("reducing tess: %f\n", g.tess);
 		break;
 	case SDLK_ESCAPE:
 	case SDLK_q:
 		if (g.debug)
-			printf("EXITING VIA KEY\n");
+			std::cout << ("EXITING VIA KEY\n");
 		exit(EXIT_SUCCESS);
 		break;
 	case SDLK_l:
@@ -712,13 +668,13 @@ void keyDown(SDL_KeyboardEvent* e)
 		g.lit = !g.lit;
 		sg.lit = !sg.lit;
 		if (g.debug)
-			printf("TOGGLING LIGHTING\n");
+			std::cout << ("TOGGLING LIGHTING\n");
 		break;
 	case SDLK_w:
 		g.wire = !g.wire;
 		sg.wireframe = !sg.wireframe;
 		if (g.debug)
-			printf("TOGGLING WIREFRAME\n");
+			std::cout << ("TOGGLING WIREFRAME\n");
 		break;
 	//case ']':
 	//	poly *= 2;
@@ -734,7 +690,7 @@ void keyDown(SDL_KeyboardEvent* e)
 			frog.v.y = frog.v0.y;
 			frog.v.z = frog.v0.z;
 			if (g.debug)
-				printf("jump\n");
+				std::cout << ("jump\n");
 		}
 		break;
 	case SDLK_x:
@@ -745,29 +701,29 @@ void keyDown(SDL_KeyboardEvent* e)
 		g.dead = false;
 		break;
 	case SDLK_v:
-		printf("v; toggling VBO\n");
+		std::cout << ("v; toggling VBO\n");
 		g.vbo = !g.vbo;
 		break;
 
 	//FROG CONTROLS
 
 	case SDLK_LEFT:
-		//printf("left");
+		//std::cout << ("left");
 		if (frog.v0.x > MAX_X * -1)
 			frog.v0.x -= SCALE;
 		break;
 	case SDLK_RIGHT:
-		//printf("right");
+		//std::cout << ("right");
 		if (frog.v0.x < MAX_X)
 			frog.v0.x += SCALE;
 		break;
 	case SDLK_DOWN:
-		//printf("down");
+		//std::cout << ("down");
 		if (magnitude(-1 * SCALE))
 			frog.v0.y -= SCALE;
 		break;
 	case SDLK_UP:
-		//printf("up");
+		//std::cout << ("up");
 		if (magnitude(SCALE))
 			frog.v0.y += SCALE;
 		break;
@@ -780,6 +736,7 @@ void keyDown(SDL_KeyboardEvent* e)
 
 void displayOSD()
 {
+	//on screen display, needs glut
 	char buffer[30];
 	char* bufp;
 	int w, h;
@@ -805,21 +762,21 @@ void displayOSD()
 	/* Frame rate */
 	glColor3f(1.0, 1.0, 0.0);
 	glRasterPos2i(10, 60);
-	printf(buffer, sizeof buffer, "fr (f/s): %6.0f", g.frameRate);
+	std::cout << (buffer, sizeof buffer, "fr (f/s): %6.0f", g.frameRate);
 	for (bufp = buffer; *bufp; bufp++)
 		glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
 
 	/* Time per frame */
 	glColor3f(1.0, 1.0, 0.0);
 	glRasterPos2i(10, 40);
-	snprintf(buffer, sizeof buffer, "ft (ms/f): %5.0f", 1.0 / g.frameRate * 1000.0);
+	std::cout << (buffer, sizeof buffer, "ft (ms/f): %5.0f", 1.0 / g.frameRate * 1000.0);
 	for (bufp = buffer; *bufp; bufp++)
 		glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
 
 	//tess
 	glColor3f(1.0, 1.0, 0.0);
 	glRasterPos2i(10, 20);
-	snprintf(buffer, sizeof buffer, "tess: %d", g.tess);
+	std::cout << (buffer, sizeof buffer, "tess: %d", g.tess);
 	for (bufp = buffer; *bufp; bufp++)
 		glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
 
@@ -890,14 +847,13 @@ void display()
 	displayOSD();
 	glPopMatrix();
 
-	// Does the same thing as glutSwapBuffers
 	SDL_GL_SwapWindow(window);
 
 	g.frames++;
 	while ((err = glGetError()) != GL_NO_ERROR) 
 	{
-		printf("%s %d\n", __FILE__, __LINE__);
-		printf("display: %s\n", gluErrorString(err));
+		std::cout << ("%s %d\n", __FILE__, __LINE__);
+		std::cout << ("display: %s\n", gluErrorString(err));
 	}
 
 
@@ -908,7 +864,7 @@ void update(void)
 	static float lastT = -1.0;
 	float t, dt;
 
-	t = glutGet(GLUT_ELAPSED_TIME) / (float)MILLI - g.startTime;
+	t = SDL_GetTicks() / milli;
 	if (lastT < 0.0)
 	{
 		lastT = t;
@@ -918,7 +874,7 @@ void update(void)
 	dt = t - lastT;
 	g.time = dt;
 	if (g.debug)
-		printf("%f %f\n", t, dt);
+		std::cout << ("%f %f\n", t, dt);
 	if ((!g.dead || !g.stationary) && !g.pause)
 		updateNumerical(&frog, dt);
 	lastT = t;
@@ -931,7 +887,7 @@ void update(void)
 		g.frames = 0;
 	}
 	idle();
-	glutPostRedisplay();
+	postRedisplay();
 }
 
 void mouse(int button, int x, int y)
@@ -1062,15 +1018,17 @@ int initGraphics()
 			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 			640, 480, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	if (!window) {
-		fprintf(stderr, "%s:%d: create window failed: %s\n",
-			__FILE__, __LINE__, SDL_GetError());
+		//std::cout << (stderr, "%s:%d: create window failed: %s\n",
+		//	__FILE__, __LINE__, SDL_GetError());
+		std::cout << "window broke";
 		exit(EXIT_FAILURE);
 	}
 
 	SDL_GLContext mainGLContext = SDL_GL_CreateContext(window);
 	if (mainGLContext == 0) {
-		fprintf(stderr, "%s:%d: create context failed: %s\n",
-			__FILE__, __LINE__, SDL_GetError());
+		//std::cout << (stderr, "%s:%d: create context failed: %s\n",
+		//	__FILE__, __LINE__, SDL_GetError());
+		std::cout << "mainGLContext = 0, which is bad";
 		exit(EXIT_FAILURE);
 	}
 
@@ -1091,8 +1049,9 @@ void initVBO()
 int main(int argc, char** argv) //done
 {
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-		fprintf(stderr, "%s:%d: unable to init SDL: %s\n",
-			__FILE__, __LINE__, SDL_GetError());
+		//std::cout << (stderr, "%s:%d: unable to init SDL: %s\n",
+		//	__FILE__, __LINE__, SDL_GetError());
+		std::cout << "SDL_init failed";
 		exit(EXIT_FAILURE);
 	}
 

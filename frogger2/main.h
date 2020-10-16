@@ -6,6 +6,9 @@ class main
 	#include <math.h>
 	#include <list>
 
+	#include <string>
+	#include <iostream>
+
 	#if _WIN32
 	#   include <Windows.h>
 	#	include <GL/glew.h>
@@ -138,5 +141,6 @@ class main
 
 	typedef enum { inactive, rotate, pan, zoom } CameraControl;
 	int err;
+	const float milli = 1000.0;
 }
 
