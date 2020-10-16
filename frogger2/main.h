@@ -1,7 +1,6 @@
 #pragma once
 class main
 {
-	// util.h
 	#include <stdbool.h>
 	#include <stdio.h>
 	#include <math.h>
@@ -9,6 +8,7 @@ class main
 
 	#if _WIN32
 	#   include <Windows.h>
+	#	include <GL/glew.h>
 	#endif
 	#if __APPLE__
 
@@ -30,6 +30,19 @@ class main
 	#include <glm/gtc/type_ptr.hpp>
 	#include <glm/gtc/constants.hpp>
 	#include <SDL.h>
+	#include "shaders.h"
+
+	#define vertecies 0
+	#define normals 1
+	#define offsetBuffer 2
+
+	typedef enum { line, fill } polygonMode_t;
+	typedef enum { grid, wave } shape_t;
+
+	//SHADERS!
+	GLuint shaderProgram;
+	const char* vert = "shader.vert";
+	const char* frag = "shader.frag";
 
 	#define vertecies 0
 	#define normals 1
@@ -80,13 +93,15 @@ class main
 	typedef struct 
 	{
 		bool debug; 
-		int tesselation; 
+		int tess; 
 		bool lit, wire, stationary, dead;
 		float g; 
 		float startTime; 
 		int frames;
 		float frameRate, frameRateInterval, lastFrameRateT, time; 
 		bool pause;
+		int width, height;
+		bool vbo;
 	} global;
 
 	typedef struct 
@@ -117,5 +132,11 @@ class main
 	} shape_globals;
 
 	shape_globals sg;
+
+	void (*displayFunc)();
+	void display();
+
+	typedef enum { inactive, rotate, pan, zoom } CameraControl;
+	int err;
 }
 

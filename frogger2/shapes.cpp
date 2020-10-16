@@ -33,18 +33,18 @@ void drawSphere(vec3f centre, float r, float slices, float stacks)
 	{
 		phi = j / (float)stacks * M_PI;
 
-		z1 = r * cosf(phi);
-		z2 = r * cosf(phi + step_phi);
+		z1 = r * cos(phi);
+		z2 = r * cos(phi + step_phi);
 
-		sin_phi = r * sinf(phi);
-		sin_phi_step = r * sinf(phi + step_phi);
+		sin_phi = r * sin(phi);
+		sin_phi_step = r * sin(phi + step_phi);
 
 		glBegin(GL_QUAD_STRIP);
 		for (int i = 0; i <= slices; i++) {
 			theta = i / (float)slices * 2.0 * M_PI;
 
-			sin_theta = sinf(theta);
-			cos_theta = cosf(theta);
+			sin_theta = sin(theta);
+			cos_theta = cos(theta);
 
 			x1 = sin_phi * cos_theta;
 			y1 = sin_phi * sin_theta;
@@ -78,15 +78,15 @@ void drawCylinder(vec3f centre, float r, float slices, float length)
 	z1 = centre.z - (length);
 	z2 = centre.z + (length);
 
-	sin_phi = r * sinf(phi);
+	sin_phi = r * sin(phi);
 
 	glBegin(GL_QUAD_STRIP);
 	for (int i = 0; i <= slices; i++)
 	{
 		theta = i / (float)slices * 2.0 * M_PI;
 
-		sin_theta = sinf(theta);
-		cos_theta = cosf(theta);
+		sin_theta = sin(theta);
+		cos_theta = cos(theta);
 
 		x = sin_phi * cos_theta;
 		y = sin_phi * sin_theta;

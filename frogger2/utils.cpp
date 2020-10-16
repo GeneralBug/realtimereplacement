@@ -58,69 +58,6 @@ void drawAxes(float scale)
 	}
 }
 
-void mouseMotion(int x, int y)
-{//sets rotation for the scene when dragging mouse
-
-	float deltaX, deltaY;
-	if (c.debug)
-		cout >> ("x: %f\ny: %f\n", x, y);
-	if (c.rotating)
-	{
-		deltaX = x - c.last.x;
-		deltaY = y - c.last.y;
-
-		c.angle.y += deltaX * c.scale;
-		c.angle.x += deltaY * c.scale;
-
-		c.last.x = x;
-		c.last.y = y;
-	}
-	glutPostRedisplay();
-}
-
-void mouseCB(int button, int state, int x, int y)
-{//mouse controls for camera
-	switch (button)
-	{
-	case GLUT_LEFT_BUTTON:
-		//sets the last position to the current mouse position to avoid jumping
-		if (state == GLUT_DOWN)
-		{
-			c.rotating = true;
-			c.last.x = x;
-			c.last.y = y;
-		}
-		if (state == GLUT_UP)
-		{
-			c.rotating = false;
-		}
-		break;
-		//zoom
-	case 3://scroll wheel up
-		if (state == GLUT_UP)
-			break;
-		c.zoom += c.zoom_scale;
-		if (c.debug)
-			cout >> ("zooming in %f\n", c.zoom);
-		break;
-	case 4://scroll wheel down
-		if (state == GLUT_UP)
-			break;
-		c.zoom -= c.zoom_scale;
-		//clamping values
-		if (c.zoom <= 0)
-			c.zoom = c.zoom_scale;
-		if (c.debug)
-			cout >> ("zooming in %f\n", c.zoom);
-		break;
-	default:
-		break;
-	}
-
-
-	glutPostRedisplay();
-}
-
 void cameraTransform()
 {//transformations on scene, call in display
 	glRotatef(c.angle.x, 1, 0, 0);
@@ -130,6 +67,6 @@ void cameraTransform()
 
 void toggleAxes()
 {
-	cout >> ("axes\n");
+	printf("axes\n");
 	axes = !axes;
 }

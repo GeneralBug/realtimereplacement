@@ -6,8 +6,16 @@
  * =========================================== */
 #include "main.h"
 
+
 global g = { false, 16, false, false, true, false, -0.25,
-	0.0f, 0, 0.0f, 0.2f, 0.0f, 0.0f, false };
+	0.0f, 0, 0.0f, 0.2f, 0.0f, 0.0f, false, 0, 0, true };
+
+struct camera_t {
+	int lastX, lastY;
+	float rotateX, rotateY;
+	float scale;
+	CameraControl control;
+} camera = { 0, 0, 30.0, -30.0, 1.0, inactive };
 
 float light_pos[] = { 1, 1, 1, 0 };
 float light_colour[] = { 0, 0, 0, 0 };
@@ -72,11 +80,37 @@ float colour_body[] = { 1, 0, 0 };
 float colour_wheel[] = { 0.1, 0.1, 0.1 };
 float colour_log[] = { 0.7, 0.4, 0 };
 
-void init()
+SDL_Window* window;
+GLuint buffers[3];
+
+void quit(int code) //done
 {
-	glShadeModel(GL_SMOOTH);
+	SDL_DestroyWindow(window);
+	SDL_Quit();
+	exit(code);
+}
+
+int wantRedisplay = 1;
+void postRedisplay() //done
+{
+	wantRedisplay = 1;
+}
+
+void init() //done
+{
+	glClearColor(0.0, 0.0, 0.0, 1.0);
+	if (g.twoside)
+		glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_NORMALIZE);
+	glShadeModel(GL_FLAT);
+	glColor3f(1.0, 1.0, 1.0);
+	displayFunc = &display;
+
+	GLenum err = glewInit();
+
+	//shaders
+	shaderProgram = getShader(vert, frag);
+	glUseProgram(shaderProgram); //need glew to run this? not recognised by SDL
 }
 
 void drawCar(float scale, vec3f pos)
@@ -86,7 +120,7 @@ void drawCar(float scale, vec3f pos)
 	//body
 	glColor3f(colour_body[0], colour_body[1], colour_body[2]);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, colour_body);
-	drawSphere(pos, scale, g.tesselation, g.tesselation);
+	drawSphere(pos, scale, g.tess, g.tess);
 	y_val = pos.y - scale;
 	scale /= 2;
 
@@ -97,7 +131,7 @@ void drawCar(float scale, vec3f pos)
 	temp_wheel_pos.y = y_val;
 	temp_wheel_pos.z += scale;
 
-	drawSphere(temp_wheel_pos, scale / 2, g.tesselation, g.tesselation);
+	drawSphere(temp_wheel_pos, scale / 2, g.tess, g.tess);
 	temp_wheel_pos = pos;
 	glColor3f(colour_wheel[0], colour_wheel[1], colour_wheel[2]);
 	//wheel 2
@@ -105,7 +139,7 @@ void drawCar(float scale, vec3f pos)
 	temp_wheel_pos.y = y_val;
 	temp_wheel_pos.z -= scale;
 
-	drawSphere(temp_wheel_pos, scale / 2, g.tesselation, g.tesselation);
+	drawSphere(temp_wheel_pos, scale / 2, g.tess, g.tess);
 	temp_wheel_pos = pos;
 	glColor3f(colour_wheel[0], colour_wheel[1], colour_wheel[2]);
 	//wheel 3
@@ -113,7 +147,7 @@ void drawCar(float scale, vec3f pos)
 	temp_wheel_pos.y = y_val;
 	temp_wheel_pos.z += scale;
 
-	drawSphere(temp_wheel_pos, scale / 2, g.tesselation, g.tesselation);
+	drawSphere(temp_wheel_pos, scale / 2, g.tess, g.tess);
 	temp_wheel_pos = pos;
 	glColor3f(colour_wheel[0], colour_wheel[1], colour_wheel[2]);
 	//wheel 4
@@ -121,7 +155,7 @@ void drawCar(float scale, vec3f pos)
 	temp_wheel_pos.y = y_val;
 	temp_wheel_pos.z -= scale;
 
-	drawSphere(temp_wheel_pos, scale / 2, g.tesselation, g.tesselation);
+	drawSphere(temp_wheel_pos, scale / 2, g.tess, g.tess);
 }
 
 void drawFrog(float scale)
@@ -174,7 +208,7 @@ void drawFrog(float scale)
 	vec3f origin = { 0,0,0 };
 	glColor3f(colour[0], colour[1], colour[2]);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, colour);
-	drawSphere(origin, scale, g.tesselation, g.tesselation);
+	drawSphere(origin, scale, g.tess, g.tess);
 
 	//glPopMatrix();
 
@@ -261,7 +295,7 @@ void drawGrid(int gridSize, float scale, bool wave, vec3f colour)
 					if ((logs[l].x >= coords_left.x - LOG_RADIUS && logs[l].x <= coords_right.x + LOG_RADIUS)
 						)//	|| (logs[l].x >= coords_right.x && logs[l].x <= coords_right.x ))
 					{
-						cout >> ("adjusting log height\n");
+						printf("adjusting log height\n");
 						logs[l].y = coords_left.y;
 					}
 				}
@@ -282,10 +316,10 @@ void drawGrid(int gridSize, float scale, bool wave, vec3f colour)
 				normals_right.y = 1;
 				normals_right.x = 0;
 			}
-			len = sqrtf(normals_left.x * normals_left.x + normals_left.y * normals_left.y);
+			len = sqrt(normals_left.x * normals_left.x + normals_left.y * normals_left.y);
 			normals_left.x /= len;
 			normals_left.y /= len;
-			len = sqrtf(normals_right.x * normals_right.x + normals_right.y * normals_right.y);
+			len = sqrt(normals_right.x * normals_right.x + normals_right.y * normals_right.y);
 			normals_right.x /= len;
 			normals_right.y /= len;
 
@@ -334,10 +368,10 @@ bool magnitude(float scale)
 float getNextTime(float time, float final_time)
 {
 	if (g.debug)
-		cout >> ("in time: %f\n", time);
-	time = time + (final_time / g.tesselation);
+		printf("in time: %f\n", time);
+	time = time + (final_time / g.tess);
 	if (g.debug)
-		cout >> ("out time: %f\n", time);
+		printf("out time: %f\n", time);
 	return time;
 }
 
@@ -525,8 +559,8 @@ void drawQuadratic()
 		}
 		if (g.debug)
 		{
-			cout >> ("===================\n");
-			cout >> ("X: %f Y: %f Z: %f T: %f\n", next.x, next.y, next.z, t);
+			printf("===================\n");
+			printf("X: %f Y: %f Z: %f T: %f\n", next.x, next.y, next.z, t);
 		}
 	}
 	glEnd();
@@ -592,66 +626,79 @@ void drawEnvironment()
 {
 	//ground
 	glTranslatef(0, 0, -0.5 * TILE_SIZE);
-	drawGrid(g.tesselation, 2 * TILE_SIZE, false, ground_colour);
+	drawGrid(g.tess, 2 * TILE_SIZE, false, ground_colour);
 	//ground 2
 	glTranslatef(TILE_SIZE, 0, 0);
-	drawGrid(g.tesselation, 2 * TILE_SIZE, false, ground_colour);
+	drawGrid(g.tess, 2 * TILE_SIZE, false, ground_colour);
 	//riverbed
 	glTranslatef(TILE_SIZE, -2, 0);
-	drawGrid(g.tesselation, 2 * TILE_SIZE, false, sand_colour);
+	drawGrid(g.tess, 2 * TILE_SIZE, false, sand_colour);
 	//ground 3
 	glTranslatef(TILE_SIZE, 2, 0);
-	drawGrid(g.tesselation, 2 * TILE_SIZE, false, ground_colour);
+	drawGrid(g.tess, 2 * TILE_SIZE, false, ground_colour);
 	//road
 	glTranslatef(10 - (3 * TILE_SIZE), ROAD_HEIGHT, 0);
-	drawGrid(g.tesselation, 2 * TILE_SIZE, false, road_colour);
+	drawGrid(g.tess, 2 * TILE_SIZE, false, road_colour);
 	//water
 	glTranslatef(20, -1 * (1 + ROAD_HEIGHT), 0);
-	drawGrid(g.tesselation, 2 * TILE_SIZE, true, water_colour);
+	drawGrid(g.tess, 2 * TILE_SIZE, true, water_colour);
 
 
 }
 
-void keyboardCB(unsigned char key, int x, int y)
+void keyDown(SDL_KeyboardEvent* e)
 {
-	switch (key) {
-	case 'g':
+	/*
+		ESCAPE  : close
+		A       : decrease scale
+		D		: increase scale
+		P       : toggle debug
+		L       : toggle lighting
+		W       : toggle wireframe
+		N       : toggle normals
+		R		: restart
+		V       : toggle VBOs
+		X		: toggle axes
+		F1      : increase tesselation
+		F2      : decrease tesselation
+	*/
+	switch (e->keysym.sym) {
+	case SDLK_g:
 		g.pause = !g.pause;
-
 		break;
-	case '`':
+	case SDLK_p:
 		g.debug = !g.debug;
 		c.debug = !c.debug;
 		break;
-	case 'a':
+	case SDLK_a:
 		frog.v0.z -= SCALE;
 		break;
-	case 'd':
+	case SDLK_d:
 		frog.v0.z += SCALE;
 		break;
-	case 'n':
+	case SDLK_n:
 		sg.drawNormals = !sg.drawNormals;
 		break;
-	case '=':
-		//TODO: add tesselation limit
-		g.tesselation *= 2;
+	case SDLK_F1:
+		//TODO: add tess limit
+		g.tess *= 2;
 		if (g.debug)
-			cout >> ("increasing tesselation: %f\n", g.tesselation);
+			printf("increasing tess: %f\n", g.tess);
 		break;
-	case '-':
-		if (g.tesselation > 4)
-			g.tesselation /= 2;
+	case SDLK_F2:
+		if (g.tess > 4)
+			g.tess /= 2;
 
 		if (g.debug)
-			cout >> ("reducing tesselation: %f\n", g.tesselation);
+			printf("reducing tess: %f\n", g.tess);
 		break;
-	case 27:
-	case 'q':
+	case SDLK_ESCAPE:
+	case SDLK_q:
 		if (g.debug)
-			cout >> ("EXITING VIA KEY\n");
+			printf("EXITING VIA KEY\n");
 		exit(EXIT_SUCCESS);
 		break;
-	case 'l':
+	case SDLK_l:
 		if (!g.lit)
 		{
 			glEnable(GL_LIGHTING);
@@ -665,20 +712,20 @@ void keyboardCB(unsigned char key, int x, int y)
 		g.lit = !g.lit;
 		sg.lit = !sg.lit;
 		if (g.debug)
-			cout >> ("TOGGLING LIGHTING\n");
+			printf("TOGGLING LIGHTING\n");
 		break;
-	case 'f':
+	case SDLK_w:
 		g.wire = !g.wire;
 		sg.wireframe = !sg.wireframe;
 		if (g.debug)
-			cout >> ("TOGGLING WIREFRAME\n");
+			printf("TOGGLING WIREFRAME\n");
 		break;
-	case ']':
-		poly *= 2;
-		break;
-	case '[':
-		poly /= 2;
-		break;
+	//case ']':
+	//	poly *= 2;
+	//	break;
+	//case '[':
+	//	poly /= 2;
+	//	break;
 	case ' ':
 		if (g.stationary && !g.dead)
 		{
@@ -687,59 +734,49 @@ void keyboardCB(unsigned char key, int x, int y)
 			frog.v.y = frog.v0.y;
 			frog.v.z = frog.v0.z;
 			if (g.debug)
-				cout >> ("jump\n");
+				printf("jump\n");
 		}
 		break;
-	case 'x':
+	case SDLK_x:
 		toggleAxes();
 		break;
-	case 'r':
+	case SDLK_r:
 		frog = default_frog;
 		g.dead = false;
 		break;
-	case '1':
-		cout >> ("r:   x: %f y: %f z: %f\nr0:  x: %f y: %f z: %f\nv:   x: %f y: %f z: %f\nv0:  x: %f y: %f z: %f\n",
-			frog.r.x, frog.r.y, frog.r.z, frog.r0.x, frog.r0.y, frog.r0.z, frog.v.x, frog.v.y, frog.v.z, frog.v0.x, frog.v0.y, frog.v0.z);
+	case SDLK_v:
+		printf("v; toggling VBO\n");
+		g.vbo = !g.vbo;
+		break;
+
+	//FROG CONTROLS
+
+	case SDLK_LEFT:
+		//printf("left");
+		if (frog.v0.x > MAX_X * -1)
+			frog.v0.x -= SCALE;
+		break;
+	case SDLK_RIGHT:
+		//printf("right");
+		if (frog.v0.x < MAX_X)
+			frog.v0.x += SCALE;
+		break;
+	case SDLK_DOWN:
+		//printf("down");
+		if (magnitude(-1 * SCALE))
+			frog.v0.y -= SCALE;
+		break;
+	case SDLK_UP:
+		//printf("up");
+		if (magnitude(SCALE))
+			frog.v0.y += SCALE;
 		break;
 	default:
 		break;
 	}
-	glutPostRedisplay();
+	postRedisplay();
 }
 
-void specialCB(int key, int x, int y)
-{
-	//used for arrow keys, not sure why they need their own special function
-	if (g.stationary && !g.dead)
-	{
-		//TODO: establish bounds
-		switch (key)
-		{
-		case GLUT_KEY_LEFT:
-			//cout >> ("left");
-			if (frog.v0.x > MAX_X * -1)
-				frog.v0.x -= SCALE;
-			break;
-		case GLUT_KEY_RIGHT:
-			//cout >> ("right");
-			if (frog.v0.x < MAX_X)
-				frog.v0.x += SCALE;
-			break;
-		case GLUT_KEY_DOWN:
-			//cout >> ("down");
-			if (magnitude(-1 * SCALE))
-				frog.v0.y -= SCALE;
-			break;
-		case GLUT_KEY_UP:
-			//cout >> ("up");
-			if (magnitude(SCALE))
-				frog.v0.y += SCALE;
-			break;
-		default:
-			break;
-		}
-	}
-}
 
 void displayOSD()
 {
@@ -768,21 +805,21 @@ void displayOSD()
 	/* Frame rate */
 	glColor3f(1.0, 1.0, 0.0);
 	glRasterPos2i(10, 60);
-	sncout >> (buffer, sizeof buffer, "fr (f/s): %6.0f", g.frameRate);
+	printf(buffer, sizeof buffer, "fr (f/s): %6.0f", g.frameRate);
 	for (bufp = buffer; *bufp; bufp++)
 		glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
 
 	/* Time per frame */
 	glColor3f(1.0, 1.0, 0.0);
 	glRasterPos2i(10, 40);
-	sncout >> (buffer, sizeof buffer, "ft (ms/f): %5.0f", 1.0 / g.frameRate * 1000.0);
+	snprintf(buffer, sizeof buffer, "ft (ms/f): %5.0f", 1.0 / g.frameRate * 1000.0);
 	for (bufp = buffer; *bufp; bufp++)
 		glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
 
-	//tesselation
+	//tess
 	glColor3f(1.0, 1.0, 0.0);
 	glRasterPos2i(10, 20);
-	sncout >> (buffer, sizeof buffer, "tesselation: %d", g.tesselation);
+	snprintf(buffer, sizeof buffer, "tess: %d", g.tess);
 	for (bufp = buffer; *bufp; bufp++)
 		glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
 
@@ -803,7 +840,10 @@ void display()
 	//GLenum err;
 
 	vec3f car = { 10, 1, 0 };
-	glMatrixMode(GL_MODELVIEW);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glMatrixMode(GL_MODELVIEW);
+
+    glViewport(0, 0, g.width, g.height);
 	glLoadIdentity();
 	glPushMatrix();
 
@@ -841,7 +881,7 @@ void display()
 	{
 		glColor3f(colour_log[0], colour_log[1], colour_log[2]);
 		glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, colour_log);
-		drawCylinder(logs[i], LOG_RADIUS, g.tesselation, LOG_SIZE);
+		drawCylinder(logs[i], LOG_RADIUS, g.tess, LOG_SIZE);
 	}
 
 	drawEnvironment();
@@ -850,12 +890,15 @@ void display()
 	displayOSD();
 	glPopMatrix();
 
-	glutSwapBuffers();
+	// Does the same thing as glutSwapBuffers
+	SDL_GL_SwapWindow(window);
 
 	g.frames++;
-	// Check for errors
-	//while ((err = glGetError()) != GL_NO_ERROR)
-	//	cout >> ("%s\n",gluErrorString(err));
+	while ((err = glGetError()) != GL_NO_ERROR) 
+	{
+		printf("%s %d\n", __FILE__, __LINE__);
+		printf("display: %s\n", gluErrorString(err));
+	}
 
 
 }
@@ -875,7 +918,7 @@ void update(void)
 	dt = t - lastT;
 	g.time = dt;
 	if (g.debug)
-		cout >> ("%f %f\n", t, dt);
+		printf("%f %f\n", t, dt);
 	if ((!g.dead || !g.stationary) && !g.pause)
 		updateNumerical(&frog, dt);
 	lastT = t;
@@ -887,24 +930,185 @@ void update(void)
 		g.lastFrameRateT = t;
 		g.frames = 0;
 	}
-
+	idle();
 	glutPostRedisplay();
 }
 
-int main(int argc, char** argv)
+void mouse(int button, int x, int y)
 {
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
-	glutInitWindowSize(600, 600);
-	glutInitWindowPosition(0, 0);
-	glutCreateWindow("s3718372 - Assignment 2");
-	glutKeyboardFunc(keyboardCB);
-	glutSpecialFunc(specialCB);
-	glutMotionFunc(mouseMotion);
-	glutMouseFunc(mouseCB);
-	glutReshapeFunc(reshape);
-	glutDisplayFunc(display);
-	glutIdleFunc(update);
+	camera.lastX = x;
+	camera.lastY = y;
+
+	switch (button) {
+	case SDL_BUTTON_LEFT:
+		camera.control = rotate;
+		break;
+	case SDL_BUTTON_MIDDLE:
+		camera.control = pan;
+		break;
+	case SDL_BUTTON_RIGHT:
+		camera.control = zoom;
+		break;
+	default:
+		break;
+	}
+}
+
+void motion(int x, int y)
+{
+	float dx, dy;
+
+	dx = x - camera.lastX;
+	dy = y - camera.lastY;
+	camera.lastX = x;
+	camera.lastY = y;
+
+	switch (camera.control)
+	{
+	case inactive:
+		break;
+	case rotate:
+		camera.rotateX += dy;
+		camera.rotateY += dx;
+		break;
+	case pan:
+		break;
+	case zoom:
+		camera.scale += dy / 100.0;
+		break;
+	}
+
+	postRedisplay();
+}
+
+void eventDispatcher()
+{
+	SDL_Event e;
+
+	// Handle events, stolen from robot example
+	while (SDL_PollEvent(&e))
+	{
+		switch (e.type)
+		{
+		case SDL_QUIT:
+			quit(0);
+			break;
+		case SDL_MOUSEMOTION:
+			motion(e.motion.x, e.motion.y);
+			break;
+		case SDL_MOUSEBUTTONDOWN:
+			mouse(e.button.button, e.button.x, e.button.y);
+			break;
+		case SDL_MOUSEBUTTONUP:
+			camera.control = inactive;
+			break;
+		case SDL_KEYDOWN:
+			keyDown(&e.key);
+			break;
+		case SDL_WINDOWEVENT:
+			switch (e.window.event)
+			{
+			case SDL_WINDOWEVENT_SHOWN:
+				break;
+			case SDL_WINDOWEVENT_SIZE_CHANGED:
+				break;
+			case SDL_WINDOWEVENT_RESIZED:
+				if (e.window.windowID == SDL_GetWindowID(window))
+				{
+					SDL_SetWindowSize(window, e.window.data1, e.window.data2);
+					reshape(e.window.data1, e.window.data2);
+					postRedisplay();
+				}
+				break;
+			case SDL_WINDOWEVENT_CLOSE:
+				break;
+			default:
+				break;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+void sys_shutdown()
+{
+	SDL_Quit();
+}
+
+void mainLoop() //done
+{
+	while (1) {
+		eventDispatcher();
+		if (wantRedisplay) {
+			displayFunc();
+			wantRedisplay = 0;
+		}
+		update();
+	}
+}
+
+int initGraphics()
+{
+	SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
+	window =
+		SDL_CreateWindow("Frogger 2",
+			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+			640, 480, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+	if (!window) {
+		fprintf(stderr, "%s:%d: create window failed: %s\n",
+			__FILE__, __LINE__, SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+
+	SDL_GLContext mainGLContext = SDL_GL_CreateContext(window);
+	if (mainGLContext == 0) {
+		fprintf(stderr, "%s:%d: create context failed: %s\n",
+			__FILE__, __LINE__, SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+
+	int w, h;
+	SDL_GetWindowSize(window, &w, &h);
+	reshape(w, h);
+
+	return 0;
+}
+void initVBO() 
+{
+	glGenBuffers(3, buffers);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_NORMAL_ARRAY);
+}
+
+
+int main(int argc, char** argv) //done
+{
+	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+		fprintf(stderr, "%s:%d: unable to init SDL: %s\n",
+			__FILE__, __LINE__, SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+
+	// Set up the window and OpenGL rendering context 
+	if (initGraphics()) {
+		SDL_Quit();
+		return EXIT_FAILURE;
+	}
+
+	// OpenGL initialisation, must be done before any OpenGL calls
 	init();
-	glutMainLoop();
+	initVBO();
+
+	atexit(sys_shutdown);
+
+	mainLoop();
+
+	return 0;
 }
