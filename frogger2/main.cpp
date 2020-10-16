@@ -9,7 +9,7 @@
 
 
 global g = { false, 16, false, false, true, false, -0.25,
-	0.0f, 0, 0.0f, 0.2f, 0.0f, 0.0f, false, 0, 0, true };
+	0.0f, 0, 0.0f, 0.2f, 0.0f, 0.0f, false, 0, 0, false };
 
 struct camera_t {
 	int lastX, lastY;
@@ -108,8 +108,43 @@ void init() //done
 	GLenum err = glewInit();
 
 	//shaders
-	shaderProgram = getShader(vert, frag);
-	glUseProgram(shaderProgram); //need glew to run this? not recognised by SDL
+	//shaderProgram = getShader(vert, frag);
+	//glUseProgram(shaderProgram); //need glew to run this? not recognised by SDL
+}
+
+void drawAxes(float scale)
+{//draws a set of axes based on scale
+	if (axes)
+	{
+		glm::vec4 v;
+
+		glPushAttrib(GL_CURRENT_BIT);
+		glBegin(GL_LINES);
+
+		/* x axis */
+		glColor3f(1.0, 0.0, 0.0);
+		v = modelViewMatrix * glm::vec4(-scale, 0.0, 0.0, 1.0);
+		glVertex3fv(&v[0]);
+		v = modelViewMatrix * glm::vec4(scale, 0.0, 0.0, 1.0);
+		glVertex3fv(&v[0]);
+
+		/* y axis */
+		glColor3f(0.0, 1.0, 0.0);
+		v = modelViewMatrix * glm::vec4(0.0, -scale, 0.0, 1.0);
+		glVertex3fv(&v[0]);
+		v = modelViewMatrix * glm::vec4(0.0, scale, 0.0, 1.0);
+		glVertex3fv(&v[0]);
+
+		/* z axis */
+		glColor3f(0.0, 0.0, 1.0);
+		v = modelViewMatrix * glm::vec4(0.0, 0.0, -scale, 1.0);
+		glVertex3fv(&v[0]);
+		v = modelViewMatrix * glm::vec4(0.0, 0.0, scale, 1.0);
+		glVertex3fv(&v[0]);
+
+		glEnd();
+		glPopAttrib();
+	}
 }
 
 void drawCar(float scale, vec3f pos)
@@ -585,12 +620,9 @@ void idle()
 	t = SDL_GetTicks() / milli;
 
 	// Accumulate time if animation enabled
-	if (g.animate) {
-		dt = t - g.time;
-		g.t += dt;
-		g.time = t;
-	}
-
+	dt = t - g.time;
+	g.t += dt;
+	g.time = t;
 	// Update stats, although could make conditional on a flag set interactively
 	dt = (t - g.lastFrameRateT);
 	if (dt > g.frameRateInterval) {
@@ -995,9 +1027,11 @@ void sys_shutdown()
 
 void mainLoop() //done
 {
-	while (1) {
+	while (1) 
+	{
 		eventDispatcher();
-		if (wantRedisplay) {
+		if (wantRedisplay) 
+		{
 			displayFunc();
 			wantRedisplay = 0;
 		}

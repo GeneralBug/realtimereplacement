@@ -314,7 +314,7 @@ void consolePM()
  */
 glm::vec3 computeLighting(glm::vec3& rEC, glm::vec3& nEC)
 {
-
+    //TODO: replace
     // Used to accumulate ambient, diffuse and specular contributions
     // Note: it is a vec3 being constructed with a single value which
     // is used for all 3 components

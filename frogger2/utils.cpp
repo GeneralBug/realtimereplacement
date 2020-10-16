@@ -18,30 +18,7 @@ void reshape(int w, int h)
 	glLoadIdentity();
 }
 
-void drawAxes(float scale)
-{//draws a set of axes based on scale
-	if (axes)
-	{
-		//x
-		glColor3f(1.0f, 0.0f, 0.0f);
-		glBegin(GL_LINES);
-		glVertex3f(0, 0, 0);
-		glVertex3f(scale, 0, 0);
-		glEnd();
-		//y
-		glColor3f(0.0f, 1.0f, 0.0f);
-		glBegin(GL_LINES);
-		glVertex3f(0, 0, 0);
-		glVertex3f(0, scale, 0);
-		glEnd();
-		//z
-		glColor3f(0.0f, 0.0f, 1.0f);
-		glBegin(GL_LINES);
-		glVertex3f(0, 0, 0);
-		glVertex3f(0, 0, scale);
-		glEnd();
-	}
-}
+
 
 void cameraTransform()
 {//transformations on scene, call in display
